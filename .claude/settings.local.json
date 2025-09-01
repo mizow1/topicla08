@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(c:\\Users\\OW\\pj\\topicla07-claude-api/**)",
+      "Bash(git init:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

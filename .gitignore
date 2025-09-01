@@ -1,0 +1,41 @@
+# 環境変数ファイル
+.env
+
+# ログファイル
+*.log
+
+# 一時ファイル
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# OS固有のファイル
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE/エディタファイル
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# PHP固有
+vendor/
+composer.phar
+composer.lock
+
+# Python固有
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.env/
+
+# 出力ファイル
+seo_analysis_result.txt
