@@ -104,12 +104,34 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
+        .result h1 {
+            color: #2c3e50;
+            margin-top: 30px;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #e74c3c;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+        }
         .result h2, .result h3, .result h4 {
             color: #2c3e50;
             margin-top: 25px;
             margin-bottom: 15px;
             border-bottom: 2px solid #3498db;
             padding-bottom: 5px;
+        }
+        .technical-seo {
+            background-color: #f8f9ff;
+            border-left: 5px solid #3498db;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .content-seo {
+            background-color: #fff8f0;
+            border-left: 5px solid #e67e22;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
         }
         .result h2 {
             font-size: 1.4em;

@@ -38,8 +38,8 @@ class MarkdownConverter {
                 continue;
             }
             
-            // 見出し処理 (## → <h2>, ### → <h3>)
-            if (preg_match('/^(#{2,6})\s+(.+)$/', $trimmedLine, $matches)) {
+            // 見出し処理 (# → <h1>, ## → <h2>, ### → <h3>)
+            if (preg_match('/^(#{1,6})\s+(.+)$/', $trimmedLine, $matches)) {
                 if ($inList) {
                     $html .= str_repeat('</ul>', $listLevel);
                     $inList = false;
@@ -48,6 +48,22 @@ class MarkdownConverter {
                 
                 $level = strlen($matches[1]);
                 $text = trim($matches[2]);
+                
+                // H1タグの場合、テクニカルSEOかコンテンツSEOかで異なるCSSクラスを適用
+                if ($level == 1) {
+                    if (strpos($text, 'テクニカルSEO') !== false) {
+                        $html .= "<div class='technical-seo'><h{$level}>{$text}</h{$level}>";
+                        continue;
+                    } elseif (strpos($text, 'コンテンツSEO') !== false) {
+                        // 前のテクニカルSEOセクションを閉じる
+                        if (strpos($html, '<div class=\'technical-seo\'>') !== false && strpos($html, '</div>', strrpos($html, '<div class=\'technical-seo\'>')) === false) {
+                            $html .= "</div>\n";
+                        }
+                        $html .= "<div class='content-seo'><h{$level}>{$text}</h{$level}>";
+                        continue;
+                    }
+                }
+                
                 $html .= "<h{$level}>{$text}</h{$level}>\n";
                 continue;
             }
@@ -113,6 +129,14 @@ class MarkdownConverter {
         // 最後にリストが開いている場合は閉じる
         if ($inList) {
             $html .= str_repeat('</ul>', $listLevel);
+        }
+        
+        // 最後にSEOセクションのdivが開いている場合は閉じる
+        if (strpos($html, '<div class=\'technical-seo\'>') !== false && strpos($html, '</div>', strrpos($html, '<div class=\'technical-seo\'>')) === false) {
+            $html .= "</div>\n";
+        }
+        if (strpos($html, '<div class=\'content-seo\'>') !== false && strpos($html, '</div>', strrpos($html, '<div class=\'content-seo\'>')) === false) {
+            $html .= "</div>\n";
         }
         
         return $html;
