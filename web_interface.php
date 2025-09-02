@@ -104,6 +104,49 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
+        .result h2, .result h3, .result h4 {
+            color: #2c3e50;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+        .result h2 {
+            font-size: 1.4em;
+        }
+        .result h3 {
+            font-size: 1.2em;
+        }
+        .result ul {
+            margin: 15px 0;
+            padding-left: 25px;
+        }
+        .result li {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+        .result strong {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+        .result code {
+            background-color: #ecf0f1;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .result p {
+            line-height: 1.7;
+            margin: 12px 0;
+        }
+        .result a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .result a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -125,12 +168,14 @@
         <?php
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['url'])) {
             require_once 'seo_analyzer.php';
+            require_once 'markdown_converter.php';
             
             echo '<div class="loading">🔄 分析中... しばらくお待ちください</div>';
             echo '<script>document.querySelector(".btn").disabled = true;</script>';
             
             try {
                 $analyzer = new SEOAnalyzer();
+                $converter = new MarkdownConverter();
                 $result = $analyzer->analyzeUrl($_POST['url']);
                 
                 echo '<div class="page-info">';
@@ -148,7 +193,7 @@
                 
                 echo '<div class="result">';
                 echo '<h3>🎯 SEO分析結果・改善提案</h3>';
-                echo htmlspecialchars($result['seo_analysis']);
+                echo $converter->convertToHtml($result['seo_analysis']);
                 echo '</div>';
                 
                 // 分析結果をファイルに保存
