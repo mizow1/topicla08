@@ -155,6 +155,21 @@ class SEOAnalyzer {
         if ($useMockData) {
             return $this->getMockAnalysis($pageInfo);
         }
+        
+        // cURLが利用可能かチェック
+        if (!function_exists('curl_init')) {
+            throw new Exception('cURLが利用できません');
+        }
+        
+        // API設定の確認
+        if (empty($this->api_key)) {
+            throw new Exception('Claude APIキーが設定されていません');
+        }
+        
+        if (!preg_match('/^sk-ant-api/', $this->api_key)) {
+            throw new Exception('Claude APIキーの形式が正しくありません');
+        }
+        
         $analysisPrompt = "以下のWebページのSEO情報を分析し、SEOの観点から改善案を提案してください。
 
 === ページ情報 ===
@@ -184,7 +199,7 @@ Twitterカード数: " . count($pageInfo['twitter_tags']) . "
 
         $data = [
             'model' => 'claude-3-7-sonnet-latest',
-            'max_tokens' => 4000,
+            'max_tokens' => 50000,
             'temperature' => 0.3,
             'messages' => [
                 [
@@ -194,27 +209,71 @@ Twitterカード数: " . count($pageInfo['twitter_tags']) . "
             ]
         ];
         
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'POST',
-                'header' => 'Content-Type: application/json' . "\r\n" .
-                           'x-api-key: ' . $this->api_key . "\r\n" .
-                           'anthropic-version: 2023-06-01',
-                'content' => json_encode($data),
-                'timeout' => 60
-            ]
+        // cURLを使用してAPI呼び出し
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, 'https://api.anthropic.com/v1/messages');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'PHP-cURL/8.3');
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'x-api-key: ' . $this->api_key,
+            'anthropic-version: 2023-06-01',
+            'Content-Length: ' . strlen(json_encode($data))
         ]);
         
-        $response = @file_get_contents('https://api.anthropic.com/v1/messages', false, $context);
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
+        $curl_info = curl_getinfo($ch);
+        curl_close($ch);
+        
+        // デバッグ情報をログに出力
+        error_log('Claude API Debug Info: ' . json_encode([
+            'http_code' => $http_code,
+            'curl_error' => $curl_error,
+            'response_length' => strlen($response),
+            'connect_time' => $curl_info['connect_time'],
+            'total_time' => $curl_info['total_time']
+        ]));
         
         if ($response === false) {
-            throw new Exception('Claude API呼び出しエラー');
+            throw new Exception('Claude API通信エラー: ' . $curl_error);
+        }
+        
+        if ($http_code !== 200) {
+            $error_msg = 'Claude API HTTPエラー: ' . $http_code;
+            if (!empty($response)) {
+                $decoded = json_decode($response, true);
+                if ($decoded && isset($decoded['error']['message'])) {
+                    $error_msg .= ' - ' . $decoded['error']['message'];
+                }
+            }
+            throw new Exception($error_msg);
         }
         
         $result = json_decode($response, true);
         
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            error_log('JSON decode error: ' . json_last_error_msg());
+            throw new Exception('レスポンス解析エラー');
+        }
+        
         if (isset($result['error'])) {
+            error_log('Claude API error: ' . json_encode($result['error']));
             throw new Exception('Claude APIエラー: ' . $result['error']['message']);
+        }
+        
+        if (!isset($result['content'][0]['text'])) {
+            error_log('Unexpected response format: ' . json_encode($result));
+            throw new Exception('予期しないレスポンス形式');
         }
         
         return $result['content'][0]['text'];
