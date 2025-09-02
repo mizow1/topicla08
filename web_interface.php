@@ -148,7 +148,7 @@
                 
                 echo '<div class="result">';
                 echo '<h3>🎯 SEO分析結果・改善提案</h3>';
-                echo '<pre>' . htmlspecialchars($result['seo_analysis']) . '</pre>';
+                echo htmlspecialchars($result['seo_analysis']);
                 echo '</div>';
                 
                 // 分析結果をファイルに保存
