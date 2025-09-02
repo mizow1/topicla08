@@ -170,7 +170,21 @@ class SEOAnalyzer {
             throw new Exception('Claude APIキーの形式が正しくありません');
         }
         
-        $analysisPrompt = "以下のWebページのSEO情報を分析し、SEOの観点から改善案を提案してください。
+        $analysisPrompt = "
+あなたはSEOコンサルタントです。以下の対象ページURLを分析してください。  
+その際、必ず次のフォーマットで出力してください。  
+
+### 改善案（結論）
+- 対象ページにそのままコピペして適用できるレベルの改善案を具体的に提示してください。  
+  （例：タイトルタグ、meta description、見出しタグの改善提案、本文に追加すべき具体的な文例、内部リンク文言など）  
+- 改善案はなるべくHTMLタグや実際のテキストの形で提示してください。  
+
+### 根拠
+- なぜその改善案が有効なのか、SEO的な観点から根拠を簡潔に説明してください。  
+- Google検索のランキング要因やユーザー体験、クリック率改善などの観点を交えてください。  
+
+
+        以下のWebページのSEO情報を分析し、SEOの観点から改善案を提案してください。
 
 === ページ情報 ===
 URL: " . $pageInfo['url'] . "
@@ -280,54 +294,7 @@ Twitterカード数: " . count($pageInfo['twitter_tags']) . "
     }
     
     private function getMockAnalysis($pageInfo) {
-        return "=== SEO分析結果（モックデータ） ===
 
-## 現状の評価
-
-### 良い点
-✅ タイトルタグが設定されています: " . $pageInfo['title'] . "
-✅ ページのコンテンツ量: " . number_format($pageInfo['content_length']) . "文字
-✅ H1タグ数: " . count($pageInfo['h1_tags']) . "個
-✅ 内部リンク: " . $pageInfo['internal_links'] . "個
-
-### 改善が必要な点
-❌ メタディスクリプション: " . ($pageInfo['meta_description'] ? "設定済み" : "未設定") . "
-❌ 画像のalt属性: " . $pageInfo['images_without_alt'] . "/" . $pageInfo['total_images'] . "個が未設定
-❌ H2タグ数: " . count($pageInfo['h2_tags']) . "個
-
-## 改善提案
-
-### 優先度高
-1. **メタディスクリプションの最適化**
-   - 120-160文字で魅力的な説明文を作成
-   - 主要キーワードを自然に含める
-
-2. **画像最適化**
-   - 全画像にalt属性を追加
-   - ファイルサイズの最適化
-
-### 優先度中
-3. **見出し構造の改善**
-   - H1タグは1つに統一
-   - H2、H3タグで階層構造を明確化
-
-4. **内部リンクの強化**
-   - 関連ページへのリンクを増やす
-   - アンカーテキストの最適化
-
-### 技術的改善
-5. **ページ速度の改善**
-   - 画像の圧縮
-   - CSSとJavaScriptの最適化
-
-6. **構造化データの実装**
-   - JSON-LDでのマークアップ
-   - リッチスニペット対応
-
-## まとめ
-このページは基本的なSEO要素は整っていますが、メタディスクリプションと画像の最適化を優先的に実施することで、検索エンジンでの表示改善が期待できます。
-
-※ これはHTTPS wrapper無効環境でのモックデータです。実際のClaude API分析結果とは異なります。";
     }
     
     public function analyzeUrl($url, $useMockData = false) {
