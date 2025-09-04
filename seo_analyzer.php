@@ -151,7 +151,123 @@ class SEOAnalyzer {
         return $pageInfo;
     }
     
-    public function analyzeWithClaude($pageInfo, $useMockData = false) {
+    public function getCompetitorUrls($mainKeywords, $currentUrl, $count = 5) {
+        // 主要キーワードから検索クエリを作成
+        $searchQuery = implode(' ', array_slice($mainKeywords, 0, 3));
+        
+        // Google Custom Search API を使用（API キーが設定されている場合）
+        $googleApiKey = defined('GOOGLE_API_KEY') ? GOOGLE_API_KEY : '';
+        $searchEngineId = defined('GOOGLE_SEARCH_ENGINE_ID') ? GOOGLE_SEARCH_ENGINE_ID : '';
+        
+        if (!empty($googleApiKey) && !empty($searchEngineId)) {
+            $apiUrl = "https://www.googleapis.com/customsearch/v1?" . http_build_query([
+                'key' => $googleApiKey,
+                'cx' => $searchEngineId,
+                'q' => $searchQuery,
+                'num' => 10 // 多めに取得してフィルタリング
+            ]);
+            
+            $context = stream_context_create([
+                'http' => [
+                    'method' => 'GET',
+                    'timeout' => 10
+                ]
+            ]);
+            
+            $response = @file_get_contents($apiUrl, false, $context);
+            
+            if ($response !== false) {
+                $data = json_decode($response, true);
+                $competitors = [];
+                $currentDomain = parse_url($currentUrl, PHP_URL_HOST);
+                
+                if (isset($data['items'])) {
+                    foreach ($data['items'] as $item) {
+                        $url = $item['link'];
+                        $domain = parse_url($url, PHP_URL_HOST);
+                        
+                        // 自サイトは除外
+                        if ($domain !== $currentDomain && count($competitors) < $count) {
+                            $competitors[] = $url;
+                        }
+                    }
+                }
+                
+                if (count($competitors) > 0) {
+                    return $competitors;
+                }
+            }
+        }
+        
+        // APIが使えない場合は、一般的な競合サイトのサンプルを返す
+        // 実際のキーワードに基づいて適切なサンプルを選択
+        $sampleCompetitors = [];
+        
+        // キーワードから推測される業界に基づいてサンプルを選択
+        if (strpos(strtolower($searchQuery), 'seo') !== false) {
+            $sampleCompetitors = [
+                "https://moz.com/beginners-guide-to-seo",
+                "https://backlinko.com/seo-this-year",
+                "https://ahrefs.com/blog/seo-basics/",
+                "https://www.searchenginejournal.com/seo-guide/",
+                "https://neilpatel.com/what-is-seo/"
+            ];
+        } else {
+            // デフォルトのサンプル
+            $sampleCompetitors = [
+                "https://www.example1.com/similar-content",
+                "https://www.example2.com/related-page",
+                "https://www.example3.com/competitor-article",
+                "https://www.example4.com/alternative-resource",
+                "https://www.example5.com/competing-content"
+            ];
+        }
+        
+        return array_slice($sampleCompetitors, 0, $count);
+    }
+    
+    public function analyzeCompetitors($pageInfo, $competitorUrls) {
+        $competitorData = [];
+        
+        foreach ($competitorUrls as $url) {
+            try {
+                $html = $this->fetchUrlContent($url);
+                $competitorInfo = $this->extractPageInfo($html, $url);
+                $competitorData[] = $competitorInfo;
+            } catch (Exception $e) {
+                // エラーの場合はスキップ
+                continue;
+            }
+        }
+        
+        return $competitorData;
+    }
+    
+    private function formatCompetitorData($competitorData) {
+        if (empty($competitorData)) {
+            return "競合データが取得できませんでした。";
+        }
+        
+        $formatted = "";
+        foreach ($competitorData as $index => $competitor) {
+            $num = $index + 1;
+            $formatted .= "
+### 競合サイト{$num}
+- **URL**: {$competitor['url']}
+- **タイトル**: {$competitor['title']}
+- **メタディスクリプション**: {$competitor['meta_description']}
+- **コンテンツ文字数**: {$competitor['content_length']}文字
+- **H1数**: " . count($competitor['h1_tags']) . "
+- **H2数**: " . count($competitor['h2_tags']) . "
+- **画像数**: {$competitor['total_images']}
+- **内部リンク数**: {$competitor['internal_links']}
+";
+        }
+        
+        return $formatted;
+    }
+
+    public function analyzeWithClaude($pageInfo, $useMockData = false, $competitorData = []) {
         if ($useMockData) {
             return $this->getMockAnalysis($pageInfo);
         }
@@ -171,150 +287,136 @@ class SEOAnalyzer {
         }
         
         $analysisPrompt = "
-あなたはSEOコンサルタントです。以下の対象ページURLを分析してください。
-分析結果を「テクニカルSEO」と「コンテンツSEO」の2つのカテゴリに分けて提案してください。
+あなたはSEOコンサルタントです。以下のWebページを分析し、改善提案をしてください。
 
-=== ページ情報 ===
 URL: " . $pageInfo['url'] . "
 タイトル: " . $pageInfo['title'] . "
 メタディスクリプション: " . $pageInfo['meta_description'] . "
-H1タグ: " . implode(', ', $pageInfo['h1_tags']) . "
-H2タグ: " . implode(', ', array_slice($pageInfo['h2_tags'], 0, 5)) . "
-H3タグ: " . implode(', ', array_slice($pageInfo['h3_tags'], 0, 5)) . "
-画像数: " . $pageInfo['total_images'] . "（alt属性なし: " . $pageInfo['images_without_alt'] . "）
-内部リンク数: " . $pageInfo['internal_links'] . "
-外部リンク数: " . $pageInfo['external_links'] . "
-カノニカルURL: " . $pageInfo['canonical_url'] . "
-メタロボッツ: " . $pageInfo['meta_robots'] . "
-OGタグ数: " . count($pageInfo['og_tags']) . "
-Twitterカード数: " . count($pageInfo['twitter_tags']) . "
-コンテンツ文字数: " . $pageInfo['content_length'] . "
+H1: " . implode(', ', $pageInfo['h1_tags']) . "
+H2: " . implode(', ', array_slice($pageInfo['h2_tags'], 0, 3)) . "
+画像: " . $pageInfo['total_images'] . "個（alt属性なし: " . $pageInfo['images_without_alt'] . "個）
+内部リンク: " . $pageInfo['internal_links'] . "個
+外部リンク: " . $pageInfo['external_links'] . "個
+コンテンツ文字数: " . $pageInfo['content_length'] . "文字
 
-=== 出力フォーマット ===
-以下の構成で回答してください：
+以下の構成で分析結果を提示してください：
 
 # 🔧 テクニカルSEO改善案
-
 ## 1. メタタグ最適化
+- 改善案
+- 根拠
 
-### 結論
-- 具体的な改善案を提示（コピペできる形式で）
+## 2. 構造化データ改善
+- 改善案
+- 根拠
 
-### 根拠
-- SEO技術的な観点からの根拠
+## 3. 画像最適化
+- 改善案
+- 根拠
 
-### 補足説明
-- 実装方法や注意点
-
-## 2. 構造化データ・タグ改善
-
-### 結論
-[同様の構成]
-
-### 根拠
-[同様の構成]
-
-### 補足説明
-[同様の構成]
-
-## 3. 画像・メディア最適化
-
-### 結論
-[同様の構成]
-
-### 根拠
-[同様の構成]
-
-### 補足説明
-[同様の構成]
-
-## 4. 内部リンク構造最適化
-
-### 結論
-[同様の構成]
-
-### 根拠
-[同様の構成]
-
-### 補足説明
-[同様の構成]
-
-## 5. パフォーマンス・技術改善
-
-### 結論
-[同様の構成]
-
-### 根拠
-[同様の構成]
-
-### 補足説明
-[同様の構成]
-
----
+## 4. 内部リンク改善
+- 改善案
+- 根拠
 
 # ✍️ コンテンツSEO改善案
+## 1. タイトル・見出し改善
+- 改善案
+- 根拠
 
-## 1. タイトル・見出し魅力度向上
+## 2. コンテンツ拡充提案
+- 改善案
+- 根拠
 
-### 結論
-- ユーザーにより魅力的で興味を引くタイトル案を提示
-- クリック率向上を狙った改善案
+## 3. ユーザー体験向上
+- 改善案
+- 根拠
 
-### 根拠
-- ユーザー行動とエンゲージメント向上の観点
+# 🎯 トピック拡張戦略
+このページの主要キーワードとコンテンツを基に、トピッククラスター戦略を提案してください。
 
-### 補足説明
-- 実装時の注意点とA/Bテスト提案
+## ピラーページ（中核記事）
+- **推奨タイトル**: （SEOタイトル60文字以内）
+- **メタディスクリプション**: （160文字以内）
+- **見出し構成**: H1〜H3の構造化された見出し案
 
-## 2. コンテンツの充実・拡張提案
+## クラスターページ（関連記事群）
+以下の5つの関連記事を提案してください：
 
-### 結論
-- 不足しているコンテンツ要素の特定
-- ユーザーのニーズに応える追加コンテンツ案
+### 1. [クラスター記事1]
+- **タイトル**: 
+- **メタディスクリプション**: 
+- **見出し構成**: 
+- **ピラーページとの関連性**: 
 
-### 根拠
-- 検索意図とユーザー満足度の観点
+### 2. [クラスター記事2]
+- **タイトル**: 
+- **メタディスクリプション**: 
+- **見出し構成**: 
+- **ピラーページとの関連性**: 
 
-### 補足説明
-- 具体的なコンテンツ制作方針
+### 3. [クラスター記事3]
+- **タイトル**: 
+- **メタディスクリプション**: 
+- **見出し構成**: 
+- **ピラーページとの関連性**: 
 
-## 3. ユーザーエクスペリエンス向上
+### 4. [クラスター記事4]
+- **タイトル**: 
+- **メタディスクリプション**: 
+- **見出し構成**: 
+- **ピラーページとの関連性**: 
 
-### 結論
-- 読みやすさ・使いやすさの改善案
-- エンゲージメント向上施策
+### 5. [クラスター記事5]
+- **タイトル**: 
+- **メタディスクリプション**: 
+- **見出し構成**: 
+- **ピラーページとの関連性**: 
 
-### 根拠
-- ユーザビリティとSEO効果の関係
+## 内部リンク戦略
+- ピラーページから各クラスターページへのリンク方法
+- クラスターページ間の相互リンク方法
+- アンカーテキストの提案
 
-### 補足説明
-- 具体的な改善手順
+# 🏆 競合分析
+このページのキーワードで上位表示されている競合サイトを分析し、改善点を特定してください。
 
-## 4. 関連キーワード・トピック拡張
+## 競合サイト概要
+以下の競合サイト情報を基に分析を行ってください：
+" . $this->formatCompetitorData($competitorData) . "
 
-### 結論
-- 狙うべき関連キーワードの提案
-- コンテンツ拡張の方向性
+## 競合比較分析
+### 1. コンテンツボリューム比較
+- **自サイト**: " . $pageInfo['content_length'] . "文字
+- **競合平均との差**: 分析結果
+- **改善提案**: 
 
-### 根拠
-- 検索ボリュームとユーザーニーズ分析
+### 2. 見出し構造比較
+- **自サイトのH1数**: " . count($pageInfo['h1_tags']) . "
+- **自サイトのH2数**: " . count($pageInfo['h2_tags']) . "
+- **競合との構造比較**: 
+- **改善提案**: 
 
-### 補足説明
-- キーワード戦略の実装方法
+### 3. 画像・メディア活用比較
+- **自サイト画像数**: " . $pageInfo['total_images'] . "
+- **競合との比較**: 
+- **改善提案**: 
 
-## 5. エンゲージメント・シェアラビリティ向上
+### 4. 内部リンク戦略比較
+- **自サイト内部リンク数**: " . $pageInfo['internal_links'] . "
+- **競合との比較**: 
+- **改善提案**: 
 
-### 結論
-- SNSシェアやユーザー参加を促す要素の追加提案
-- より魅力的なコンテンツにするための施策
+## 競合に勝つための戦略
+### 1. 差別化ポイント
+- 競合にない独自価値の提案
 
-### 根拠
-- ソーシャルシグナルとSEO効果
+### 2. 不足コンテンツの特定
+- 競合が扱っているが自サイトにない要素
 
-### 補足説明
-- 具体的な実装アイデア
+### 3. 上位表示のための具体的アクション
+- 優先度の高い改善項目3つ
 
-上記の構成で、テクニカルSEOは技術的な改善点を、コンテンツSEOはユーザーにとってより魅力的で興味を引く内容にする提案を中心に回答してください。";
+具体的で実装可能な提案をしてください。";
 
         $data = [
             // 'model' => 'claude-3-7-sonnet-latest',
@@ -335,8 +437,8 @@ Twitterカード数: " . count($pageInfo['twitter_tags']) . "
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 180);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 60);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         curl_setopt($ch, CURLOPT_USERAGENT, 'PHP-cURL/8.3');
@@ -365,7 +467,11 @@ Twitterカード数: " . count($pageInfo['twitter_tags']) . "
         ]));
         
         if ($response === false) {
-            throw new Exception('Claude API通信エラー: ' . $curl_error);
+            if (strpos($curl_error, 'timeout') !== false) {
+                throw new Exception('Claude API通信タイムアウト: APIレスポンスに時間がかかりすぎています。しばらく待ってから再度お試しください。詳細: ' . $curl_error);
+            } else {
+                throw new Exception('Claude API通信エラー: ' . $curl_error);
+            }
         }
         
         if ($http_code !== 200) {
@@ -403,23 +509,36 @@ Twitterカード数: " . count($pageInfo['twitter_tags']) . "
 
     }
     
-    public function analyzeUrl($url, $useMockData = false) {
+    public function analyzeUrl($url, $useMockData = false, $includeCompetitorAnalysis = true) {
         echo "URL取得中: " . $url . "\n";
         $html = $this->fetchUrlContent($url);
         
         echo "ページ情報抽出中...\n";
         $pageInfo = $this->extractPageInfo($html, $url);
         
+        $competitorData = [];
+        if ($includeCompetitorAnalysis && !$useMockData) {
+            echo "競合サイト分析中...\n";
+            // 主要キーワードを抽出（タイトルとH1から）
+            $keywords = array_merge(
+                explode(' ', $pageInfo['title']), 
+                $pageInfo['h1_tags']
+            );
+            $competitorUrls = $this->getCompetitorUrls($keywords, $url);
+            $competitorData = $this->analyzeCompetitors($pageInfo, $competitorUrls);
+        }
+        
         if ($useMockData) {
             echo "モックデータでSEO分析中...\n";
         } else {
             echo "Claude APIでSEO分析中...\n";
         }
-        $analysis = $this->analyzeWithClaude($pageInfo, $useMockData);
+        $analysis = $this->analyzeWithClaude($pageInfo, $useMockData, $competitorData);
         
         return [
             'page_info' => $pageInfo,
-            'seo_analysis' => $analysis
+            'seo_analysis' => $analysis,
+            'competitor_data' => $competitorData
         ];
     }
 }

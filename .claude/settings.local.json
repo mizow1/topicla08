@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Read(c:\\Users\\OW\\pj\\topicla07-claude-api/**)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Read(/C:\\Users\\OW\\pj\\topicla08/**)",
+      "Read(/C:\\Users\\OW\\pj\\topicla08/**)",
+      "Read(/C:\\Users\\OW\\pj\\topicla08/**)",
+      "Read(/C:\\Users\\OW\\pj\\topicla08/**)",
+      "Read(/C:\\Users\\OW\\pj\\topicla08/**)",
+      "Read(/C:\\Users\\OW\\pj\\topicla08/**)",
+      "Read(/C:\\Users\\OW\\pj\\topicla08/**)",
+      "Read(/C:\\Users\\OW\\pj\\topicla08/**)"
     ],
     "deny": [],
     "ask": []

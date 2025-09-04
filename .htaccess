@@ -1,0 +1,19 @@
+# PHP設定の調整
+php_value max_execution_time 600
+php_value max_input_time 600
+php_value memory_limit 512M
+php_value post_max_size 100M
+php_value upload_max_filesize 100M
+
+# FastCGI/mod_fcgidの設定（該当する場合）
+<IfModule mod_fcgid.c>
+    FcgidIOTimeout 600
+    FcgidConnectTimeout 600
+    FcgidBusyTimeout 600
+    FcgidIdleTimeout 600
+</IfModule>
+
+# mod_fastcgiの設定（該当する場合）
+<IfModule mod_fastcgi.c>
+    FastCgiConfig -idle-timeout 600 -killInterval 600 -maxRequestLen 10485760
+</IfModule>
